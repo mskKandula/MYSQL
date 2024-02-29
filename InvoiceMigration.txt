@@ -1,0 +1,216 @@
+SHOW DATABASES;
+
+USE newlms_paymentdb;
+
+SHOW TABLES;
+
+DROP TABLE Invoices;
+DROP TABLE InvoiceStudents;
+DROP TABLE InvoicePayments;
+
+CREATE TABLE Invoices (
+  pkInvoiceId INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  invoiceId VARCHAR(255),
+  invoiceNumber VARCHAR(255) UNIQUE NOT NULL,
+  invoicePath VARCHAR(255) UNIQUE,
+  accountDeptInvoicePath VARCHAR(255),
+  invoiceType VARCHAR(255) NOT NULL,
+  invoiceGroup VARCHAR(255) NOT NULL,
+  collectiveInvoiceId VARCHAR(255),
+  collectiveInvoiceClientId VARCHAR(255),
+  invoiceDate TIMESTAMP DEFAULT (NOW()),
+  clientId VARCHAR(255) NOT NULL,
+  instituteProfileId VARCHAR(255),
+  academicYearId VARCHAR(255) NOT NULL,
+  academicYearName VARCHAR(255) NOT NULL,
+  affiliationAuthorityName VARCHAR(255) NOT NULL,
+  affiliationAuthorityId VARCHAR(255) NOT NULL,
+  standardName VARCHAR(255),
+  standardId VARCHAR(255),
+  instituteName VARCHAR(255),
+  instituteId VARCHAR(255),
+  instituteTypeId VARCHAR(255) NOT NULL,
+  instituteTypeName VARCHAR(255) NOT NULL,
+  totalStudentCount INT NOT NULL,
+  isDeleted BOOLEAN DEFAULT 0,
+  createdBy VARCHAR(255) NOT NULL,
+  createdOn TIMESTAMP DEFAULT (NOW())
+);
+
+SELECT pkInvoiceId FROM Invoices WHERE clientId = ? AND invoiceNumber = ?;
+
+CREATE TABLE InvoiceStudents (
+  pkInvoiceStudentId INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  studentAcademicProfileId VARCHAR(255),
+  studentId VARCHAR(255) NOT NULL,
+  studentFullName VARCHAR(255) NOT NULL,
+  studentRollNumber VARCHAR(255) NOT NULL,
+  studentAcademicYearId VARCHAR(255) NOT NULL,
+  studentAcademicYearName VARCHAR(255) NOT NULL,
+  studentAffiliationAuthorityId VARCHAR(255) NOT NULL,
+  studentAffiliationAuthorityName VARCHAR(255) NOT NULL,
+  studentStandardName VARCHAR(255) NOT NULL,
+  studentStandardId  VARCHAR (255) NOT NULL,
+  studentDivisionName VARCHAR(255) NOT NULL,
+  studentDivisionId VARCHAR(255) NOT NULL,
+  studentShiftName VARCHAR(255) NOT NULL,
+  studentShiftId VARCHAR(255) NOT NULL,
+  additionDate TIMESTAMP DEFAULT (NOW()),
+  isDeleted BOOLEAN DEFAULT 0,
+  amount INT DEFAULT 100,
+  cgstAmount INT,
+  sgstAmount INT,
+  fkInvoiceId INT
+);
+
+
+
+CREATE TABLE InvoicePayments (
+  pkInvoicePaymentId INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  amount INT NOT NULL,
+  cgstPercentage INT NOT NULL,
+  cgstAmount INT,
+  sgstPercentage INT NOT NULL,
+  sgstAmount INT,
+  totalTaxAmount INT,
+  totalAmount INT,
+  typeOfFee VARCHAR(255) NOT NULL,
+  invoiceStatus VARCHAR(255) NOT NULL,
+  paymentDate TIMESTAMP DEFAULT (NOW()),
+  fkInvoiceId INT
+);
+
+ALTER TABLE InvoiceStudents ADD FOREIGN KEY (fkInvoiceId) REFERENCES Invoices (pkInvoiceId);
+
+ALTER TABLE InvoicePayments ADD FOREIGN KEY (fkInvoiceId) REFERENCES Invoices (pkInvoiceId);
+
+
+SET FOREIGN_KEY_CHECKS=0;
+
+DELETE FROM Invoices;
+DELETE FROM InvoiceStudents;
+DELETE FROM InvoicePayments;
+
+SELECT * FROM Invoices;
+
+UPDATE InvoiceStudents SET isDeleted = TRUE WHERE studentRollNumber = '176'; 
+
+SELECT * FROM InvoiceStudents;
+
+SELECT * FROM InvoicePayments;
+
+//AddInvoiceService
+
+INSERT INTO Invoices(invoiceId, invoiceNumber,invoiceType, invoiceGroup, invoiceDate, clientId,
+  academicYearId, academicYearName, affiliationAuthorityName, affiliationAuthorityId, standardName, standardId, instituteName,
+  instituteId, instituteTypeName, totalStudentCount,instituteProfileId) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);
+  
+  
+  INSERT INTO InvoicePayments ( amount, cgstPercentage, cgstAmount, sgstPercentage, sgstAmount, totalTaxAmount,
+  totalAmount, typeOfFee, STATUS, fkInvoiceId) VALUES (?,?,?,?,?,?,?,?);
+  
+  
+  
+  INSERT INTO InvoiceStudents (studentAcademicProfileId, studentFullName,  studentRollNumber,studentAcademicYearId,studentAcademicYearName,
+  studentAffiliationAuthorityId,studentAffiliationAuthorityName, studentStandardName, studentStandardId,
+  studentDivisionName, studentDivisionId, studentShiftName, studentShiftId, additionDate, isDeleted, amount, cgstAmount, 
+  sgstAmount, fkInvoiceId,paymentConfirmation ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);
+  
+
+
+
+//fetchInvoicesWhoseCountGreaterThanZero
+
+SELECT 
+  i.pkInvoiceId,
+  i.invoiceId,
+  i.invoiceNumber,
+  i.invoiceDate,
+  MAX(p.paymentDate) AS paymentDate,
+  i.clientId,
+  p.invoiceStatus,
+  MAX(p.amount) AS amount,
+  i.totalStudentCount,
+  COUNT(
+    s.studentRollNumber) AS attached,
+  COUNT(
+    CASE
+      WHEN s.isDeleted = 1 
+      THEN 1 
+    END) AS deleted,
+  (
+    i.totalStudentCount - COUNT(s.studentRollNumber) + COUNT(
+      CASE
+        WHEN s.isDeleted = 1 
+        THEN 1 
+      END)
+  ) AS diff 
+FROM
+  Invoices AS i 
+  INNER JOIN InvoicePayments p 
+    ON i.pkInvoiceId = p.fkInvoiceId 
+  LEFT JOIN InvoiceStudents s 
+    ON i.pkInvoiceId = s.fkInvoiceId 
+WHERE i.clientId = "1vZ5FEs7M5xs9ZZwmERsYWLHSGb" 
+  AND i.academicYearId = "1vZ7eYvX34id5lbktoSztsmSsqx" 
+  AND i.affiliationAuthorityId = "1t1kNsBDWic2Xs3MqsTzont1rS8" 
+  AND i.isDeleted = 0 
+  AND p.invoiceStatus = "Generated" 
+  AND p.typeOfFee = "LMS" 
+GROUP BY pkInvoiceId 
+HAVING diff > 0;
+
+
+//fetchStdSpecificInvoicesWhoseCountGreaterThanZero
+
+SELECT 
+  i.pkInvoiceId,
+  i.invoiceId,
+  i.invoiceNumber,
+  i.invoiceDate,
+  MAX(p.paymentDate) AS paymentDate,
+  i.clientId,
+  p.invoiceStatus,
+  MAX(p.amount) AS amount,
+  i.totalStudentCount,
+  COUNT(
+    s.studentRollNumber) AS attached,
+  COUNT(
+    CASE
+      WHEN s.isDeleted = 1 
+      THEN 1 
+    END) AS deleted,
+  (
+    i.totalStudentCount - COUNT(
+      s.studentRollNumber) + COUNT(
+      CASE
+        WHEN s.isDeleted = 1 
+        THEN 1 
+      END)
+  ) AS diff 
+FROM
+  Invoices AS i 
+  INNER JOIN InvoicePayments p 
+    ON i.pkInvoiceId = p.fkInvoiceId 
+  LEFT JOIN InvoiceStudents s 
+    ON i.pkInvoiceId = s.fkInvoiceId 
+WHERE i.clientId = ?
+  AND i.academicYearId = ?
+  AND i.affiliationAuthorityId = ?
+`UPSTransactionPurposeMaster`  AND i.isDeleted = 0 
+  AND p.invoiceStatus = "Generated" 
+  AND p.typeOfFee = "LMS" 
+GROUP BY pkInvoiceId 
+HAVING diff > 0 ;
+
+
+SELECT * FROM Invoices INNER JOIN InvoicePayments ON pkInvoiceId = fkInvoiceId WHERE instituteTypeId="2" AND clientId = "1vZ5FEs7M5xs9ZZwmERsYWLHSGb"
+ORDER BY createdOn DESC;
+
+UPDATE Invoices SET invoicePath =?, accountDeptInvoicePath =? WHERE clientId =? AND invoiceId =?;
+
+SELECT pkInvoiceId FROM Invoices WHERE clientId = "1vZ5FEs7M5xs9ZZwmERsYWLHSGb";
+
+SELECT studentId FROM InvoiceStudents WHERE fkInvoiceId = 21;
+
+SELECT * FROM UserPaymentDtls;
